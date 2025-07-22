@@ -72,10 +72,10 @@ def user_input_features():
     riesgo_acv_label = st.sidebar.selectbox('Riesgo Cardiovascular (ACV)', options=list(map_riesgo_acv.keys()), index=1)
     riesgo_acv = map_riesgo_acv[riesgo_acv_label]
 
-    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=3, value=1, step=1)
+    conteo_nutri_post = st.sidebar.number_input('Controles con Nutricionista', min_value=0, max_value=2, value=2, step=1)
     diff_peso = st.sidebar.slider('Diferencia de Peso en el último año (kg)', min_value=-20.0, max_value=20.0, value=-2.0, step=0.5)
-    conteo_tabact_post = st.sidebar.number_input('Controles de Tabaquismo', min_value=0, max_value=20, value=0, step=1)
-    antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=5, value=10)
+    conteo_tabact_post = st.sidebar.number_input('Consumo de Tabaco', min_value=0, max_value=20, value=0, step=1)
+    antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=5, value=1)
 
     sexorev_label = st.sidebar.selectbox('Sexo Biológico', options=list(map_sexo.keys()))
     sexorev = map_sexo[sexorev_label]
@@ -88,7 +88,7 @@ def user_input_features():
         'PASpre': paspre,
         'EST_Nutricional': est_nutricional,
         'Riesgo ACV': riesgo_acv,
-        'Conteo_NUTRi_post': conteo_nutri_post,
+        'Conteo_NUTRI_post': conteo_nutri_post,
         'diff_peso': diff_peso,
         'Conteo_Tabact_post': conteo_tabact_post,
         'Antigüedad_HTA': antiguedad_hta,
