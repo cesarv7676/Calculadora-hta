@@ -11,22 +11,24 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# --- FUNCIÓN PARA CARGAR EL MODELO ---
+# --- FUNCIÓN PARA CARGAR EL MODELO Y CARACTERÍSTICAS ---
 @st.cache_resource
-def load_model():
-    """Carga el pipeline de preprocesamiento y modelo desde el archivo .pkl"""
+def load_model_and_features():
+    """Carga el pipeline y extrae los nombres de las características que el modelo espera."""
     try:
         pipeline = joblib.load('final_logistic_regression_model.pkl')
-        return pipeline
+        # Extraer los nombres de las características del primer paso del pipeline (el preprocesador)
+        feature_names = pipeline.named_steps['preprocessor'].feature_names_in_
+        return pipeline, feature_names
     except FileNotFoundError:
         st.error("Error: No se encontró el archivo del modelo 'final_logistic_regression_model.pkl'. Asegúrate de que esté en la misma carpeta que app.py.")
-        return None
+        return None, None
     except Exception as e:
         st.error(f"Ocurrió un error al cargar el modelo: {e}")
-        return None
+        return None, None
 
-# Cargar el modelo
-pipeline = load_model()
+# Cargar el modelo y la lista de características esperadas
+pipeline, model_feature_names = load_model_and_features()
 
 # --- TÍTULO Y DESCRIPCIÓN ---
 st.title("❤️ Calculadora Predictiva de Control de Presión Arterial")
@@ -38,22 +40,6 @@ st.write(
 
 # --- PANEL LATERAL PARA LA ENTRADA DE DATOS ---
 st.sidebar.header("Datos del Paciente")
-
-# --- CORRECCIÓN: Definir el orden correcto de las columnas ---
-# Este orden debe ser EXACTAMENTE el mismo que se usó para entrenar el modelo.
-# Basado en la imagen de las 10 características importantes.
-FEATURE_ORDER = [
-    'Controles_post',
-    'PASpre',
-    'EST_Nutricional',
-    'Riesgo ACV',
-    'Conteo_NUTRI_post',
-    'diff_peso',
-    'Conteo_Tabact_post',
-    'Antigüedad_HTA',
-    'SEXOrev',
-    'DIETA'
-]
 
 def user_input_features():
     """Crea los widgets en el panel lateral para la entrada de datos del usuario."""
@@ -72,9 +58,9 @@ def user_input_features():
     riesgo_acv_label = st.sidebar.selectbox('Riesgo Cardiovascular (ACV)', options=list(map_riesgo_acv.keys()), index=1)
     riesgo_acv = map_riesgo_acv[riesgo_acv_label]
 
-    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=2, value=1, step=1)
+    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=20, value=2, step=1)
     diff_peso = st.sidebar.slider('Diferencia de Peso en el último año (kg)', min_value=-20.0, max_value=20.0, value=-2.0, step=0.5)
-    conteo_tabact_post = st.sidebar.number_input('Consumo de Tabaco', min_value=0, max_value=20, value=0, step=1)
+    conteo_tabact_post = st.sidebar.number_input('Consumo de Tabaquismo', min_value=0, max_value=20, value=0, step=1)
     antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=5, value=1)
 
     sexorev_label = st.sidebar.selectbox('Sexo Biológico', options=list(map_sexo.keys()))
@@ -97,23 +83,26 @@ def user_input_features():
     }
     
     features = pd.DataFrame(data, index=[0])
-    
-    # --- CORRECCIÓN: Reordenar las columnas del DataFrame de entrada ---
-    return features[FEATURE_ORDER]
+    return features
 
 # Obtener las características del usuario
-input_df = user_input_features()
+input_df_raw = user_input_features()
 
-# --- MOSTRAR LOS DATOS INGRESADOS ---
-st.subheader('Características Ingresadas por el Usuario:')
-st.dataframe(input_df, use_container_width=True)
+# --- MOSTRAR LOS DATOS INGRESADOS (si el modelo se cargó) ---
+if model_feature_names is not None:
+    st.subheader('Características Ingresadas por el Usuario:')
+    # Reordenar el DataFrame para mostrarlo en el orden correcto
+    st.dataframe(input_df_raw[model_feature_names], use_container_width=True)
 
 # --- BOTÓN DE PREDICCIÓN Y RESULTADO ---
 if st.button('Calcular Probabilidad', key='predict_button'):
-    if pipeline is not None:
+    if pipeline is not None and model_feature_names is not None:
         try:
+            # --- CORRECCIÓN CLAVE: Reordenar el DataFrame antes de la predicción ---
+            input_df_ordered = input_df_raw[model_feature_names]
+            
             # Realizar la predicción de probabilidad
-            prediction_proba = pipeline.predict_proba(input_df)
+            prediction_proba = pipeline.predict_proba(input_df_ordered)
             
             prob_control = prediction_proba[0][1]
             
@@ -127,11 +116,11 @@ if st.button('Calcular Probabilidad', key='predict_button'):
             st.progress(prob_control)
             
             if prob_control >= 0.7:
-                st.success("El paciente tiene una ALTA probabilidad de lograr el control de su presión arterial. ¡Continuar con el buen trabajo!")
+                st.success("El paciente tiene una ALTA probabilidad de lograr el control. ¡Continuar con el buen trabajo!")
             elif prob_control >= 0.4:
                 st.warning("El paciente tiene una probabilidad MODERADA de lograr el control. Se podrían considerar intervenciones de refuerzo.")
             else:
-                st.error("El paciente tiene una BAJA probabilidad de lograr el control. Se recomienda una revisión del plan de manejo y seguimiento intensificado.")
+                st.error("El paciente tiene una BAJA probabilidad de lograr el control. Se recomienda una revisión del plan de manejo.")
 
         except Exception as e:
             st.error(f"Ocurrió un error durante la predicción: {e}")
