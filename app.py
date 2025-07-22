@@ -30,24 +30,18 @@ pipeline = load_model()
 
 # --- TÍTULO Y DESCRIPCIÓN ---
 st.title("❤️ Calculadora Predictiva de Control de Presión Arterial")
-st.write(
-    "Esta herramienta utiliza un modelo de Regresión Logística para estimar la probabilidad de que un paciente "
-    "logre controlar su presión arterial (<140/90 mmHg) a un año de seguimiento. "
-    "Por favor, ingrese los datos del paciente en el panel de la izquierda."
-)
+st.write(...) # (Sin cambios aquí)
 
 # --- PANEL LATERAL PARA LA ENTRADA DE DATOS ---
 st.sidebar.header("Datos del Paciente")
 
-# --- CORRECCIÓN CLAVE: Definir el orden de las columnas como una constante ---
-# Esta lista será nuestra única "fuente de la verdad" para el orden de las columnas.
-# El orden se basa en la imagen de las 10 características más importantes que proporcionaste.
+# --- CORRECCIÓN CLAVE 1: Corregir el nombre en la lista ---
 FINAL_MODEL_FEATURES = [
     'Controles_post',
     'PASpre',
     'EST_Nutricional',
     'Riesgo ACV',
-    'Conteo_NUTRI_post',
+    'Conteo_NUTRi_post',  # CORREGIDO: 'i' minúscula
     'diff_peso',
     'Conteo_Tabact_post',
     'Antigüedad_HTA',
@@ -63,34 +57,29 @@ def user_input_features():
     map_sexo = {'Femenino': 0, 'Masculino': 1}
     map_dieta = {'No sigue indicaciones': 0, 'Sí sigue indicaciones': 1}
 
-    # Crear los widgets (no es necesario que estén en un orden específico aquí)
+    # ... (código de los widgets sin cambios) ...
     controles_post = st.sidebar.number_input('Número de Controles en el último año', min_value=0, max_value=50, value=5, step=1)
     paspre = st.sidebar.slider('Presión Arterial Sistólica Inicial (PASpre)', min_value=90, max_value=220, value=145)
-    
     est_nutricional_label = st.sidebar.selectbox('Estado Nutricional', options=list(map_est_nutricional.keys()), index=2)
     est_nutricional = map_est_nutricional[est_nutricional_label]
-
     riesgo_acv_label = st.sidebar.selectbox('Riesgo Cardiovascular (ACV)', options=list(map_riesgo_acv.keys()), index=1)
     riesgo_acv = map_riesgo_acv[riesgo_acv_label]
-
-    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=20, value=1, step=1) # Cambiado el valor por defecto a 1
+    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=20, value=1, step=1)
     diff_peso = st.sidebar.slider('Diferencia de Peso en el último año (kg)', min_value=-20.0, max_value=20.0, value=-2.0, step=0.5)
     conteo_tabact_post = st.sidebar.number_input('Controles de Tabaquismo', min_value=0, max_value=20, value=0, step=1)
     antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=50, value=10)
-
     sexorev_label = st.sidebar.selectbox('Sexo Biológico', options=list(map_sexo.keys()))
     sexorev = map_sexo[sexorev_label]
-    
     dieta_label = st.sidebar.selectbox('Adherencia a la Dieta', options=list(map_dieta.keys()))
     dieta = map_dieta[dieta_label]
     
-    # Crear el diccionario con los datos. Las claves deben coincidir EXACTAMENTE con FINAL_MODEL_FEATURES
+    # --- CORRECCIÓN CLAVE 2: Corregir el nombre en la clave del diccionario ---
     data = {
         'Controles_post': controles_post,
         'PASpre': paspre,
         'EST_Nutricional': est_nutricional,
         'Riesgo ACV': riesgo_acv,
-        'Conteo_NUTRI_post': conteo_nutri_post,
+        'Conteo_NUTRi_post': conteo_nutri_post, # CORREGIDO: 'i' minúscula
         'diff_peso': diff_peso,
         'Conteo_Tabact_post': conteo_tabact_post,
         'Antigüedad_HTA': antiguedad_hta,
@@ -101,51 +90,30 @@ def user_input_features():
     features = pd.DataFrame(data, index=[0])
     return features
 
-# Obtener las características del usuario
+# ... (resto del código sin cambios) ...
 input_df = user_input_features()
-
-# --- MOSTRAR LOS DATOS INGRESADOS ---
 st.subheader('Características Ingresadas por el Usuario:')
-# Reordenar el DataFrame para mostrarlo en el orden correcto
 st.dataframe(input_df[FINAL_MODEL_FEATURES], use_container_width=True)
 
-
-# --- BOTÓN DE PREDICCIÓN Y RESULTADO ---
 if st.button('Calcular Probabilidad', key='predict_button'):
     if pipeline is not None:
         try:
-            # --- CORRECCIÓN: Reordenar el DataFrame antes de la predicción ---
             input_df_ordered = input_df[FINAL_MODEL_FEATURES]
-            
-            # Realizar la predicción de probabilidad
             prediction_proba = pipeline.predict_proba(input_df_ordered)
-            
             prob_control = prediction_proba[0][1]
-            
             st.subheader('Resultado de la Predicción')
-            
-            st.metric(
-                label="Probabilidad de Control de HTA a 1 año",
-                value=f"{prob_control:.1%}",
-            )
-            
+            st.metric(label="Probabilidad de Control de HTA a 1 año", value=f"{prob_control:.1%}")
             st.progress(prob_control)
-            
             if prob_control >= 0.7:
                 st.success("El paciente tiene una ALTA probabilidad de lograr el control. ¡Continuar con el buen trabajo!")
             elif prob_control >= 0.4:
                 st.warning("El paciente tiene una probabilidad MODERADA de lograr el control. Se podrían considerar intervenciones de refuerzo.")
             else:
                 st.error("El paciente tiene una BAJA probabilidad de lograr el control. Se recomienda una revisión del plan de manejo.")
-
         except Exception as e:
             st.error(f"Ocurrió un error durante la predicción: {e}")
     else:
         st.error("El modelo no está cargado. No se puede realizar la predicción.")
 
-# --- Información Adicional ---
 st.markdown("---")
-st.info(
-    "**Descargo de responsabilidad:** Esta herramienta es un demostrador basado en un modelo predictivo y no reemplaza el juicio clínico profesional. "
-    "Las predicciones deben ser interpretadas en el contexto del cuadro clínico completo del paciente."
-)
+st.info("...") # (Sin cambios aquí)
