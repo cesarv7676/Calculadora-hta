@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-# --- FUNCIÓN PARA CARGAR EL MODELO (con caché para eficiencia) ---
+# --- FUNCIÓN PARA CARGAR EL MODELO ---
 @st.cache_resource
 def load_model():
     """Carga el pipeline de preprocesamiento y modelo desde el archivo .pkl"""
@@ -28,7 +28,7 @@ def load_model():
 # Cargar el modelo
 pipeline = load_model()
 
-# --- TÍTULO Y DESCRIPCIÓN DE LA APLICACIÓN ---
+# --- TÍTULO Y DESCRIPCIÓN ---
 st.title("❤️ Calculadora Predictiva de Control de Presión Arterial")
 st.write(
     "Esta herramienta utiliza un modelo de Regresión Logística para estimar la probabilidad de que un paciente "
@@ -39,18 +39,32 @@ st.write(
 # --- PANEL LATERAL PARA LA ENTRADA DE DATOS ---
 st.sidebar.header("Datos del Paciente")
 
+# --- CORRECCIÓN: Definir el orden correcto de las columnas ---
+# Este orden debe ser EXACTAMENTE el mismo que se usó para entrenar el modelo.
+# Basado en la imagen de las 10 características importantes.
+FEATURE_ORDER = [
+    'Controles_post',
+    'PASpre',
+    'EST_Nutricional',
+    'Riesgo ACV',
+    'Conteo_NUTRI_post',
+    'diff_peso',
+    'Conteo_Tabact_post',
+    'Antigüedad_HTA',
+    'SEXOrev',
+    'DIETA'
+]
+
 def user_input_features():
     """Crea los widgets en el panel lateral para la entrada de datos del usuario."""
     
-    # Mapeos para variables categóricas (hace la interfaz más amigable)
     map_est_nutricional = {'Bajo Peso': 1, 'Normal': 2, 'Sobrepeso': 3, 'Obesidad': 4}
-    map_riesgo_acv = {'Bajo': 1, 'Moderado': 2, 'Alto': 3} # Asumiendo estos significados
-    map_sexo = {'Femenino': 0, 'Masculino': 1} # Asumiendo 0=Femenino, 1=Masculino
+    map_riesgo_acv = {'Bajo': 1, 'Moderado': 2, 'Alto': 3}
+    map_sexo = {'Femenino': 0, 'Masculino': 1}
     map_dieta = {'No sigue indicaciones': 0, 'Sí sigue indicaciones': 1}
 
-    # Crear los widgets
-    controles_post = st.sidebar.number_input('Número de Controles en el último año', min_value=0, max_value=5, value=5, step=1)
-    paspre = st.sidebar.slider('Presión Arterial Sistólica Inicial (PASpre)', min_value=90, max_value=220, value=140)
+    controles_post = st.sidebar.number_input('Número de Controles en el último año', min_value=0, max_value=50, value=5, step=1)
+    paspre = st.sidebar.slider('Presión Arterial Sistólica Inicial (PASpre)', min_value=90, max_value=220, value=145)
     
     est_nutricional_label = st.sidebar.selectbox('Estado Nutricional', options=list(map_est_nutricional.keys()), index=2)
     est_nutricional = map_est_nutricional[est_nutricional_label]
@@ -58,10 +72,10 @@ def user_input_features():
     riesgo_acv_label = st.sidebar.selectbox('Riesgo Cardiovascular (ACV)', options=list(map_riesgo_acv.keys()), index=1)
     riesgo_acv = map_riesgo_acv[riesgo_acv_label]
 
-    conteo_NUTRi_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=3, value=2, step=1)
+    conteo_nutri_post = st.sidebar.number_input('Número de Controles con Nutricionista', min_value=0, max_value=3, value=1, step=1)
     diff_peso = st.sidebar.slider('Diferencia de Peso en el último año (kg)', min_value=-20.0, max_value=20.0, value=-2.0, step=0.5)
-    conteo_tabact_post = st.sidebar.number_input('Consumo de Tabaco', min_value=0, max_value=20, value=0, step=1)
-    Antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=5, value=1)
+    conteo_tabact_post = st.sidebar.number_input('Controles de Tabaquismo', min_value=0, max_value=20, value=0, step=1)
+    antiguedad_hta = st.sidebar.slider('Años desde el diagnóstico de Hipertensión (HTA)', min_value=0, max_value=5, value=10)
 
     sexorev_label = st.sidebar.selectbox('Sexo Biológico', options=list(map_sexo.keys()))
     sexorev = map_sexo[sexorev_label]
@@ -69,13 +83,12 @@ def user_input_features():
     dieta_label = st.sidebar.selectbox('Adherencia a la Dieta', options=list(map_dieta.keys()))
     dieta = map_dieta[dieta_label]
     
-    # Crear un diccionario con los datos
     data = {
         'Controles_post': controles_post,
         'PASpre': paspre,
         'EST_Nutricional': est_nutricional,
         'Riesgo ACV': riesgo_acv,
-        'Conteo_NUTRi_post': conteo_nutri_post,
+        'Conteo_NUTRI_post': conteo_nutri_post,
         'diff_peso': diff_peso,
         'Conteo_Tabact_post': conteo_tabact_post,
         'Antigüedad_HTA': antiguedad_hta,
@@ -83,9 +96,10 @@ def user_input_features():
         'DIETA': dieta
     }
     
-    # Convertir el diccionario a un DataFrame de pandas
     features = pd.DataFrame(data, index=[0])
-    return features
+    
+    # --- CORRECCIÓN: Reordenar las columnas del DataFrame de entrada ---
+    return features[FEATURE_ORDER]
 
 # Obtener las características del usuario
 input_df = user_input_features()
@@ -94,7 +108,6 @@ input_df = user_input_features()
 st.subheader('Características Ingresadas por el Usuario:')
 st.dataframe(input_df, use_container_width=True)
 
-
 # --- BOTÓN DE PREDICCIÓN Y RESULTADO ---
 if st.button('Calcular Probabilidad', key='predict_button'):
     if pipeline is not None:
@@ -102,22 +115,17 @@ if st.button('Calcular Probabilidad', key='predict_button'):
             # Realizar la predicción de probabilidad
             prediction_proba = pipeline.predict_proba(input_df)
             
-            # Obtener la probabilidad de la clase 1 (Control HTA = 1)
             prob_control = prediction_proba[0][1]
             
             st.subheader('Resultado de la Predicción')
             
-            # Usar st.metric para un display visual atractivo
             st.metric(
                 label="Probabilidad de Control de HTA a 1 año",
-                value=f"{prob_control:.1%}", # Formatear como porcentaje con 1 decimal
-                delta=None # Se puede usar para mostrar un cambio si hubiera una comparación
+                value=f"{prob_control:.1%}",
             )
             
-            # Añadir una barra de progreso como indicador visual
             st.progress(prob_control)
             
-            # Dar una interpretación simple basada en la probabilidad
             if prob_control >= 0.7:
                 st.success("El paciente tiene una ALTA probabilidad de lograr el control de su presión arterial. ¡Continuar con el buen trabajo!")
             elif prob_control >= 0.4:
