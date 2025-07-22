@@ -88,7 +88,7 @@ def user_input_features():
         'PASpre': paspre,
         'EST_Nutricional': est_nutricional,
         'Riesgo ACV': riesgo_acv,
-        'Conteo_NUTRI_post': conteo_nutri_post,
+        'Conteo_NUTRi_post': conteo_nutri_post,
         'diff_peso': diff_peso,
         'Conteo_Tabact_post': conteo_tabact_post,
         'Antigüedad_HTA': antiguedad_hta,
